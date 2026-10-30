@@ -1,151 +1,78 @@
-# Feature Intake -> Spec Checklist — HU-01
+# Feature Intake -> Spec Checklist
 
 ## 1. Summary
-
-- Fortalecer el token devuelto por `POST /auth/login` para incluir los claims mínimos `sub`, `client`, `iat` y `exp`.
-- Obtener y validar `client` desde la solicitud, y reflejarlo en el token.
-- Mantener coherencia verificable entre `expiresIn` y `exp - now`.
-- Proteger el token, el secreto y demás valores sensibles en configuración y logs.
-- Documentar la decisión técnica entre conservar HMAC o adoptar una librería JWT.
+Add a pre-send transfer confirmation with a summary and data validation to help users avoid duplicate transfers. Target impact: reduce complaints caused by duplicate transfers by 20% in one month.
 
 ## 2. Scope
+- **Dentro del alcance**
+  - Confirm the transfer before sending.
+  - Display a transfer summary.
+  - Validate transfer data.
+- **Fuera del alcance**
+  - Infrastructure changes.
+  - Complete UI redesign.
 
-### Dentro del alcance
+## 3. Supuestos
+- The feature will use the existing REST API, web frontend, and standardized logging.
+- The accounts service and transfers service are dependencies.
 
-- Claims `sub`, `client`, `iat` y `exp`.
-- Lectura y validación de `client` desde el request de login.
-- Coherencia entre `expiresIn` y la expiración del token.
-- Configuración de `AUTH_TOKEN_SECRET` para laboratorio y otros entornos.
-- Prevención de tokens, secretos y valores sensibles en logs.
-- Pruebas de login, claims, expiración y errores de autenticación.
-- Registro de la decisión sobre HMAC frente a una librería JWT.
+## 4. Decisiones técnicas por tomar (pendientes o resueltas)
+- **Resueltas:** use the existing REST API and web frontend; follow standardized logging.
+- **Pendientes:** determine the summary fields and confirm the existing amount-validation rules.
 
-### Fuera del alcance
+## 5. Riesgos y mitigaciones
+- **Sensitive data exposure in logs:** review confirmation-related logs and ensure they do not contain sensitive data.
+- **Amount-validation errors:** confirm the existing validation rules and test valid and invalid amounts.
+- **Dependency on accounts and transfers services:** verify their contracts and integration requirements before implementation.
 
-- La HU no confirma exclusiones adicionales.
+## 6. Criterios de aceptación (medibles)
+- Every transfer is presented for confirmation with a summary before it is sent.
+- Canceling the confirmation results in no transfer being sent.
+- Data that fails the agreed validation rules is blocked from being sent and produces a validation message.
+- Duplicate-transfer complaints decrease by 20% within one month, measured against an agreed baseline.
+- Confirmation-related logs contain no sensitive values.
 
-## 3. Assumptions
+## 7. Plan de validación
+- **Pruebas unitarias**
+  - Test valid and invalid amounts against the existing validation rules.
+  - Verify confirmation allows submission and cancellation prevents it.
+- **Pruebas funcionales**
+  - Test the summary, confirmation, and submission flow with the accounts and transfers services.
+  - Measure duplicate-transfer complaints against the agreed baseline after one month.
+- **Seguridad (comprobaciones mínimas)**
+  - Review confirmation-related logs for sensitive data.
+  - Verify invalid transfer data cannot be submitted.
+- **Evidencia requerida (qué adjuntar)**
+  - Unit and functional test results.
+  - Completed logging review checklist.
+  - Versioned `SKILL.md`, `examples/input.sample.md`, and `examples/output.sample.md`, plus the Skill version reference `skill-feature-intake-v0.1.0`.
+  - Brief documentation and reviewed PR, per the team DoD.
 
-- El alcance se limita al servicio de autenticación y a `POST /auth/login`.
-- La respuesta debe continuar exponiendo `token`, `expiresIn` y `user`; cualquier cambio adicional del contrato requiere confirmación.
-- Las pruebas usarán secretos, tokens y credenciales ficticios.
-- No se presupone una tolerancia temporal, una regla de validación de `client` ni una tecnología JWT hasta resolverlas explícitamente.
+## 8. Tareas sugeridas por rol
+- **Chapter/PO**
+  - Agree on the baseline and measurement method for duplicate-transfer complaints.
+  - Confirm which transfer details the summary should display.
+- **Tech Lead**
+  - Review the existing transfer flow and REST API contracts.
+  - Confirm integration requirements for the accounts and transfers services.
+  - Define how confirmation and validation fit into the existing flow.
+- **Backend**
+  - Review the existing amount-validation rules.
+  - Implement or adjust pre-submission validation according to the agreed design.
+  - Verify that standardized logs do not expose sensitive values.
+- **Frontend**
+  - Implement the transfer summary and confirmation/cancellation actions.
+  - Connect confirmation and cancellation to the existing submission flow.
+- **QA**
+  - Create test cases for confirmation, cancellation, and data validation.
+  - Verify that cancellation and validation failures prevent submission.
+  - Attach test results and document the agreed metric measurement.
+- **Cyber**
+  - Review confirmation-related logs for sensitive data.
+  - Verify that invalid data is blocked before submission.
+  - Review the feature’s security risks within the stated scope.
 
-## 4. Technical decisions to make (pending or resolved)
-
-- **Resuelta:** los claims mínimos requeridos son `sub`, `client`, `iat` y `exp`.
-- **Resuelta:** `client` proviene de la solicitud y debe validarse antes de incluirse en el token.
-- **Pendiente:** tolerancia permitida al comparar `expiresIn` con `exp - now`.
-- **Pendiente:** reglas de obligatoriedad, formato y valores válidos para `client`.
-- **Pendiente:** conservar la implementación HMAC o adoptar una librería JWT.
-- **Pendiente:** política exacta para el secreto por defecto en el laboratorio y su ausencia fuera de él.
-- **Pendiente:** lista completa de valores considerados sensibles para las comprobaciones de logging.
-
-## 5. Risks and mitigations
-
-- **Un `client` ausente o inválido puede producir tokens ambiguos.**
-  - Mitigación: definir reglas explícitas, validar antes de emitir el token y probar casos válidos e inválidos.
-- **Una diferencia entre `expiresIn` y `exp` puede provocar expiraciones inconsistentes.**
-  - Mitigación: derivar ambos valores de la misma referencia temporal y verificar la tolerancia acordada.
-- **Tokens o secretos pueden quedar expuestos en logs.**
-  - Mitigación: evitar su registro, usar datos ficticios en pruebas y revisar evidencia de logs redactados.
-- **Un secreto por defecto fuera del laboratorio debilita la firma.**
-  - Mitigación: eliminarlo fuera del laboratorio o limitarlo y documentarlo explícitamente como valor exclusivo de laboratorio.
-- **Una implementación HMAC propia puede aumentar el riesgo de mantenimiento.**
-  - Mitigación: documentar la evaluación frente a una librería JWT antes de decidir.
-
-## 6. Acceptance criteria (measurable)
-
-- Cada token emitido por un login válido contiene valores no nulos para `sub`, `client`, `iat` y `exp`.
-- El claim `client` coincide con el valor validado recibido en la solicitud.
-- `expiresIn` coincide con `exp - now` dentro de la tolerancia documentada.
-- Existen pruebas automatizadas verdes para login válido, credenciales inválidas y token expirado.
-- Las pruebas de claims verifican explícitamente `sub`, `client`, `iat` y `exp`.
-- La revisión de logs encuentra cero tokens, secretos o valores clasificados como sensibles.
-- Fuera del laboratorio no existe un secreto por defecto; si se conserva uno para laboratorio, queda identificado como exclusivo de ese entorno.
-- La decisión HMAC frente a librería JWT queda documentada con su justificación.
-
-## 7. Validation plan
-
-### Unit tests
-
-- Verificar creación y lectura de los cuatro claims mínimos.
-- Verificar aceptación y rechazo de `client` según las reglas acordadas.
-- Verificar expiración válida, vencida y coherencia de `expiresIn` con una referencia temporal controlada.
-- Verificar firma válida y rechazo de tokens alterados.
-
-### Functional tests
-
-- Login válido: respuesta exitosa y token con claims esperados.
-- Credenciales inválidas: respuesta contractual sin emisión de token.
-- Request con `client` inválido o ausente: resultado definido por la decisión pendiente.
-- Token expirado: rechazo comprobado.
-
-### Security (minimum checks)
-
-- Inspeccionar logs del flujo válido y de error para confirmar ausencia de tokens y secretos.
-- Comprobar que la aplicación no arranca fuera del laboratorio con un secreto por defecto no autorizado.
-- Verificar que los errores no devuelvan el secreto, el token ni detalles sensibles.
-- Revisar la decisión documentada sobre HMAC o librería JWT.
-
-### Required evidence (attachments)
-
-- Salida de las pruebas unitarias y funcionales.
-- Casos de claims y expiración con datos ficticios.
-- Configuración documentada de `AUTH_TOKEN_SECRET` sin incluir su valor.
-- Evidencia sanitizada de logs redactados.
-- Documento de decisión técnica HMAC frente a librería JWT.
-
-## 8. Suggested tasks by role
-
-### Chapter/PO
-
-- Confirmar el significado funcional de `client`.
-- Acordar el comportamiento esperado cuando `client` falta o es inválido.
-- Validar que el contrato resultante satisface la HU.
-
-### Tech Lead
-
-- Definir la tolerancia temporal y la referencia usada para `now`.
-- Liderar y documentar la decisión HMAC frente a librería JWT.
-- Definir la política del secreto para laboratorio y otros entornos.
-- Revisar que el contrato de login permanezca trazable.
-
-### Backend
-
-- Incorporar y validar `client` en el flujo de autenticación.
-- Emitir y verificar `sub`, `client`, `iat` y `exp`.
-- Mantener coherentes `expiresIn` y la expiración del token.
-- Añadir las pruebas unitarias y funcionales acordadas.
-
-### Frontend
-
-- Confirmar si el consumidor actual ya envía `client`.
-- Adaptar el request solo si el contrato acordado lo requiere.
-- Verificar que no se registren ni muestren tokens en diagnósticos del cliente.
-
-### QA
-
-- Preparar casos válidos, inválidos, ausentes y de límite para `client`.
-- Verificar claims, expiración y coherencia de `expiresIn`.
-- Ejecutar login válido, credenciales inválidas y token expirado.
-- Adjuntar resultados y evidencia sanitizada.
-
-### Cyber
-
-- Revisar la gestión de `AUTH_TOKEN_SECRET` por entorno.
-- Revisar los claims mínimos, la firma y la expiración.
-- Comprobar que logs y errores no expongan valores sensibles.
-- Participar en la decisión HMAC frente a librería JWT.
-
-## 9. Open questions
-
-- ¿`client` es obligatorio? ¿Qué formato, longitud y valores se aceptan?
-- ¿Qué respuesta debe producir un `client` ausente o inválido?
-- ¿Cuál es la tolerancia exacta para comparar `expiresIn` con `exp - now`?
-- ¿Qué reloj o referencia temporal define `now`?
-- ¿Se conserva HMAC o se adopta una librería JWT? ¿Con qué criterios se decidirá?
-- ¿Qué entornos se consideran laboratorio?
-- ¿Existe actualmente un secreto por defecto y dónde está permitido?
-- ¿Qué valores, además del token y el secreto, se consideran sensibles?
-- ¿Algún consumidor requiere cambios para enviar `client`?
+## 9. Preguntas abiertas
+- What baseline and data source will measure the 20% reduction in complaints?
+- Which transfer fields should the summary display?
+- What are the existing amount-validation rules?
