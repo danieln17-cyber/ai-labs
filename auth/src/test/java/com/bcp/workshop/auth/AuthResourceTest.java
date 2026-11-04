@@ -3,11 +3,13 @@ package com.bcp.workshop.auth;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.common.QuarkusTestResource;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.core.Response;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -18,7 +20,6 @@ import java.security.Signature;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.is;
@@ -223,9 +224,26 @@ class AuthResourceTest {
     }
 
     @Test
-    void migratesLegacyPlainTextPasswordStorage() throws Exception {
-        String databaseUrl = System.getenv("AUTH_DB_URL");
-        assertNotNull(databaseUrl, "AUTH_DB_URL must point to an isolated test database");
+    void migratesLegacyPlainTextPasswordStorage(@TempDir Path databaseDirectory) throws Exception {
+        String databaseUrl = "jdbc:sqlite:" + databaseDirectory.resolve("legacy.db");
+        try (Connection connection = DriverManager.getConnection(databaseUrl)) {
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "CREATE TABLE legacy_users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT NOT NULL, display_name TEXT NOT NULL, role TEXT NOT NULL)")) {
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO legacy_users(username, password, display_name, role) VALUES (?, ?, ?, ?)")) {
+                statement.setString(1, "student");
+                statement.setString(2, "Workshop123!");
+                statement.setString(3, "Workshop Student");
+                statement.setString(4, "STUDENT");
+                statement.executeUpdate();
+            }
+        }
+
+        LegacyDatabase database = new LegacyDatabase(databaseUrl);
+        database.passwordHashService = new PasswordHashService();
+        database.initialize();
 
         try (Connection connection = DriverManager.getConnection(databaseUrl);
              PreparedStatement statement = connection.prepareStatement(

@@ -185,6 +185,11 @@ El fixture de integracion usa SQLite bajo `auth/target/` y las cuentas ficticias
 No se usan credenciales reales. Los comandos Maven se ejecutaron con directorio
 de trabajo `auth/`.
 
+La prueba `migratesLegacyPlainTextPasswordStorage` ahora crea su propio SQLite
+temporal con el esquema legacy, ejecuta la migracion y comprueba el hash y la
+eliminacion de la columna de texto plano. No requiere `AUTH_DB_URL`; los valores
+de esa variable en la tabla siguiente pertenecen a las ejecuciones historicas.
+
 | componente | IDs / alcance | comando y directorio | codigo de salida | resultado |
 |---|---|---|---|---|
 | auth | H-AUTH-01 a H-AUTH-06; regresion de auth y endpoints documentados | Antes de agregar el test directo de health: `mvn -B verify`, cwd `auth/`, `AUTH_DB_URL=jdbc:sqlite:target/h-auth-20261104-testing-baseline.db` | 0 | `BUILD SUCCESS`; 20 pruebas, 0 fallos, 0 errores. No habia una asercion directa de `GET /q/health`. |
