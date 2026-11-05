@@ -3,6 +3,7 @@ package com.bcp.workshop.auth;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -31,6 +32,9 @@ public class LegacyDatabase {
     @Inject
     PasswordHashService passwordHashService;
 
+    @ConfigProperty(name = "auth.seed-initial-users", defaultValue = "false")
+    boolean seedInitialUsers;
+
     public LegacyDatabase() {
         this(DEFAULT_DB_URL);
     }
@@ -47,8 +51,10 @@ public class LegacyDatabase {
                 connection.setAutoCommit(false);
                 try {
                     migrateLegacySchema(connection);
-                    insertSeedUser(connection, STUDENT_USERNAME, STUDENT_PASSWORD, "Workshop Student", "STUDENT");
-                    insertSeedUser(connection, TRAINER_USERNAME, TRAINER_PASSWORD, "Workshop Trainer", "TRAINER");
+                    if (seedInitialUsers) {
+                        insertSeedUser(connection, STUDENT_USERNAME, STUDENT_PASSWORD, "Workshop Student", "STUDENT");
+                        insertSeedUser(connection, TRAINER_USERNAME, TRAINER_PASSWORD, "Workshop Trainer", "TRAINER");
+                    }
                     connection.commit();
                 } catch (SQLException | RuntimeException error) {
                     connection.rollback();

@@ -22,6 +22,7 @@ class LegacyDatabaseTest {
         try {
             LegacyDatabase database = new LegacyDatabase("jdbc:sqlite:" + databasePath.toAbsolutePath());
             database.passwordHashService = new PasswordHashService();
+            database.seedInitialUsers = true;
             database.initialize();
 
             String initialPasswordHash = passwordHash(databasePath, "student");
@@ -33,6 +34,26 @@ class LegacyDatabaseTest {
 
             assertEquals(initialPasswordHash, passwordHash(databasePath, "student"));
             assertNotNull(database.findByCredentials("trainer", "Trainer123!"));
+        } finally {
+            Files.deleteIfExists(databasePath);
+        }
+    }
+
+    @Test
+    void initializesSchemaWithoutSeedUsersWhenSeedingIsDisabled() throws Exception {
+        Class.forName("org.sqlite.JDBC");
+        Path databasePath = Files.createTempFile(Path.of("target"), "h-auth-empty-", ".db");
+        try {
+            LegacyDatabase database = new LegacyDatabase("jdbc:sqlite:" + databasePath.toAbsolutePath());
+            database.passwordHashService = new PasswordHashService();
+            database.initialize();
+
+            try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + databasePath.toAbsolutePath());
+                 ResultSet users = connection.createStatement().executeQuery(
+                         "SELECT COUNT(*) FROM legacy_users")) {
+                users.next();
+                assertEquals(0, users.getInt(1));
+            }
         } finally {
             Files.deleteIfExists(databasePath);
         }
